@@ -1,0 +1,14 @@
+# Binaries and build artifacts
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage/
+
+# IDE settings
+.idea/
+.DS_Store

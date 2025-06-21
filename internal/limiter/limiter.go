@@ -49,7 +49,7 @@ func (rl *RateLimiter) Check(ctx context.Context, ip, token string) (*Result, er
 		}
 	} else {
 		key = fmt.Sprintf("ip:%s", ip)
-		limit = rl.config.TokenLimitDefault
+		limit = rl.config.IPLimit
 		id = fmt.Sprintf("ip:%s", ip)
 	}
 
@@ -62,10 +62,14 @@ func (rl *RateLimiter) Check(ctx context.Context, ip, token string) (*Result, er
 	}
 
 	if banned {
+		ttl, err := rl.storage.GetBanReset(ctx, banKey)
+		if err != nil {
+			ttl = rl.config.BlockDuration
+		}
 		return &Result{
 			Allowed:   false,
 			Reason:    fmt.Sprintf("You have reached the maximum number of requests or actions allowed within a certain time frame"),
-			ResetTime: time.Now().Add(rl.config.BlockDuration),
+			ResetTime: time.Now().Add(ttl),
 			Limit:     limit,
 			Remaining: 0,
 		}, nil
@@ -81,10 +85,15 @@ func (rl *RateLimiter) Check(ctx context.Context, ip, token string) (*Result, er
 			fmt.Printf("failed to set ban: %s: %v\n", id, err)
 		}
 
+		ttl := rl.config.BlockDuration
+		if t, err := rl.storage.GetBanReset(ctx, banKey); err == nil {
+			ttl = t
+		}
+
 		return &Result{
 			Allowed:   false,
 			Reason:    fmt.Sprintf("You have reached the maximum number of requests or actions allowed within a certain time frame"),
-			ResetTime: time.Now().Add(rl.config.BlockDuration),
+			ResetTime: time.Now().Add(ttl),
 			Limit:     limit,
 			Remaining: 0,
 		}, nil

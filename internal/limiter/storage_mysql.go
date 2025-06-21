@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
+	"strings"
 	"time"
 )
 
@@ -13,6 +15,13 @@ type MySQLStorage struct {
 }
 
 func NewMySQLStorage(dsn string) (*MySQLStorage, error) {
+	if !strings.Contains(dsn, "parseTime=") {
+		if strings.Contains(dsn, "?") {
+			dsn += "&parseTime=true"
+		} else {
+			dsn += "?parseTime=true"
+		}
+	}
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed connecting to MySQL: %w", err)
@@ -26,6 +35,7 @@ func NewMySQLStorage(dsn string) (*MySQLStorage, error) {
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS bans (k VARCHAR(255) PRIMARY KEY, expires_at TIMESTAMP)`); err != nil {
 		return nil, fmt.Errorf("create table bans: %w", err)
 	}
+	log.Printf("[MySQL] Using MySQL storage strategy")
 	return &MySQLStorage{db: db}, nil
 }
 
@@ -88,6 +98,22 @@ func (m *MySQLStorage) IsBanned(ctx context.Context, key string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func (m *MySQLStorage) GetBanReset(ctx context.Context, key string) (time.Duration, error) {
+	var expiresAt time.Time
+	err := m.db.QueryRowContext(ctx, `SELECT expires_at FROM bans WHERE k = ?`, key).Scan(&expiresAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	ttl := time.Until(expiresAt)
+	if ttl < 0 {
+		return 0, nil
+	}
+	return ttl, nil
 }
 
 func (m *MySQLStorage) Close() error {

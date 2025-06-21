@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jessicaamilena/go-rate-limiter-challenge/handlers"
 	"github.com/jessicaamilena/go-rate-limiter-challenge/internal/config"
 	"github.com/jessicaamilena/go-rate-limiter-challenge/internal/limiter"
 	"github.com/jessicaamilena/go-rate-limiter-challenge/internal/middleware"
+	_ "github.com/lib/pq"
 	"log"
 	"os"
 	"os/signal"

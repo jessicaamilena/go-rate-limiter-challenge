@@ -79,9 +79,9 @@
 									"});",
 									"",
 									"if (pm.response.code === 429) {",
-									"    pm.test(\"Rate limit exceeded response\", function () {",
+									"    pm.test(\"Rate Limit Exceeded\", function () {",
 									"        const responseJson = pm.response.json();",
-									"        pm.expect(responseJson).to.have.property('error', 'Rate limit exceeded');",
+									"        pm.expect(responseJson).to.have.property('error', 'Rate Limit Exceeded');",
 									"        pm.expect(responseJson).to.have.property('message');",
 									"        pm.expect(responseJson).to.have.property('retry_after_seconds');",
 									"    });",
@@ -90,7 +90,7 @@
 									"        pm.expect(pm.response.headers.get('Retry-After')).to.exist;",
 									"    });",
 									"    ",
-									"    console.log('Rate limit exceeded - IP banned');",
+									"    console.log('Rate Limit Exceeded - IP banned');",
 									"} else {",
 									"    pm.test(\"Successful request\", function () {",
 									"        pm.expect(pm.response.text()).to.equal('pong');",
@@ -396,7 +396,7 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"pm.test(\"Token limit takes precedence over IP limit\", function () {",
+									"pm.test(\"Custom Token limit overrides IP limit\", function () {",
 									"    const limit = parseInt(pm.response.headers.get('X-RateLimit-Limit'));",
 									"    // Should use token limit (100) not IP limit (5)",
 									"    pm.expect(limit).to.equal(100);",
@@ -447,9 +447,9 @@
 							"script": {
 								"exec": [
 									"if (pm.response.code === 429) {",
-									"    pm.test(\"Currently banned\", function () {",
+									"    pm.test(\"You have reached the maximum number of requests or actions allowed within a certain time frame\", function () {",
 									"        const responseJson = pm.response.json();",
-									"        pm.expect(responseJson.message).to.include('banned');",
+									"        pm.expect(responseJson.message).to.include('You have reached the maximum number of requests or actions allowed within a certain time frame');",
 									"        pm.expect(responseJson).to.have.property('retry_after_seconds');",
 									"    });",
 									"    ",

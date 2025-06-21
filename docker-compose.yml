@@ -2,7 +2,6 @@
 services:
   redis:
     image: redis:7-alpine
-    container_name: redis-rate-limit
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes
@@ -18,7 +17,6 @@ services:
 
   memcached:
     image: memcached:alpine
-    container_name: memcached-rate-limiter
     ports:
       - "11211:11211"
     networks:
@@ -31,7 +29,6 @@ services:
 
   mysql:
     image: mysql:8
-    container_name: mysql-rate-limiter
     environment:
       - MYSQL_ROOT_PASSWORD=root
       - MYSQL_DATABASE=go_rate_limiter_db
@@ -47,7 +44,6 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: postgres-rate-limiter
     environment:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=go_rate_limiter_db
@@ -63,18 +59,17 @@ services:
 
   app:
     build: .
-    container_name: go-rate-limiter-challenge-app
     ports:
       - "8080:8080"
     environment:
       - SERVER_PORT=8080
       - RL_IP_LIMIT=5
-      - RL_TOKEN_LIMIT_DEFAULT=3
       - RL_CUSTOM_TOKEN_LIMITS=abc123:20,xyz999:100,premium:200
-      - RL_BLOCK_DURATION_SECONDS=300
+      - RL_TOKEN_LIMIT_DEFAULT=10
+      - RL_BLOCK_DURATION_SECONDS=60
       - REDIS_URL=redis://redis:6379/0
       - MEMCACHED_SERVER=memcached:11211
-      - MYSQL_DSN=root:root@tcp(mysql:3306)/go_rate_limiter_db
+      - MYSQL_DSN=root:root@tcp(mysql:3306)/go_rate_limiter_db?parseTime=true
       - POSTGRES_DSN=postgres://postgres:postgres@postgres:5432/go_rate_limiter_db?sslmode=disable
       - STORAGE_BACKEND=redis
       - GIN_MODE=release

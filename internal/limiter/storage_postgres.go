@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -13,7 +14,7 @@ type PostgresStorage struct {
 }
 
 func NewPostgresStorage(dsn string) (*PostgresStorage, error) {
-	db, err := sql.Open("pgx", dsn)
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open postgres connection: %w", err)
 	}
@@ -26,6 +27,7 @@ func NewPostgresStorage(dsn string) (*PostgresStorage, error) {
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS bans (k TEXT PRIMARY KEY, expires_at TIMESTAMP)`); err != nil {
 		return nil, fmt.Errorf("create table bans: %w", err)
 	}
+	log.Printf("[PostgreSQL] Using PostgreSQL storage strategy")
 	return &PostgresStorage{db: db}, nil
 }
 
@@ -88,6 +90,22 @@ func (p *PostgresStorage) IsBanned(ctx context.Context, key string) (bool, error
 		return true, nil
 	}
 	return false, nil
+}
+
+func (p *PostgresStorage) GetBanReset(ctx context.Context, key string) (time.Duration, error) {
+	var expiresAt time.Time
+	err := p.db.QueryRowContext(ctx, `SELECT expires_at FROM bans WHERE k = ?`, key).Scan(&expiresAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	ttl := time.Until(expiresAt)
+	if ttl < 0 {
+		return 0, nil
+	}
+	return ttl, nil
 }
 
 func (p *PostgresStorage) Close() error {

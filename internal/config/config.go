@@ -36,7 +36,7 @@ func LoadConfig() (*Config, error) {
 		StorageBackend:    getEnvWithDefault("STORAGE_BACKEND", "redis"),
 		RedisURL:          getEnvWithDefault("REDIS_URL", "redis://localhost:6379/0"),
 		MemcachedServer:   getEnvWithDefault("MEMCACHED_SERVER", "localhost:11211"),
-		MySQLDSN:          getEnvWithDefault("MYSQL_DSN", "root:root@tcp(mysql:3306)/go_rate_limiter_db"),
+		MySQLDSN:          getEnvWithDefault("MYSQL_DSN", "root:root@tcp(mysql:3306)/go_rate_limiter_db?parseTime=true"),
 		PostgresDSN:       getEnvWithDefault("POSTGRES_DSN", "postgres://postgres:postgres@postgres:5432/go_rate_limiter_db?sslmode=disable"),
 	}
 
@@ -92,7 +92,7 @@ func parseCustomTokenLimit(envValue string) (map[string]int, error) {
 
 		parts := strings.Split(pair, ":")
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid custom token limit format: %s (expected toke:limit)", pair)
+			return nil, fmt.Errorf("invalid custom token limit format: %s (expected token:limit)", pair)
 		}
 
 		token := strings.TrimSpace(parts[0])

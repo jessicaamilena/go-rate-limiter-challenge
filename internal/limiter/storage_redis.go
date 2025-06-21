@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"log"
 	"time"
 )
 
@@ -26,7 +27,7 @@ func NewRedisStorage(redisURL string) (*RedisStorage, error) {
 	if err := client.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("failed connecting to Redis: %w", err)
 	}
-
+	log.Printf("[Redis] Using Redis storage strategy")
 	return &RedisStorage{client: client}, nil
 }
 
@@ -66,6 +67,17 @@ func (r *RedisStorage) IsBanned(ctx context.Context, key string) (bool, error) {
 		return false, fmt.Errorf("failed checking ban status: %w", result.Err())
 	}
 	return true, nil
+}
+
+func (r *RedisStorage) GetBanReset(ctx context.Context, key string) (time.Duration, error) {
+	ttl, err := r.client.TTL(ctx, key).Result()
+	if err != nil {
+		return 0, fmt.Errorf("failed getting ttl: %w", err)
+	}
+	if ttl < 0 {
+		return 0, nil
+	}
+	return ttl, nil
 }
 
 func (r *RedisStorage) Close() error {

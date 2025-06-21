@@ -30,8 +30,8 @@ This folder contains a comprehensive Postman collection for testing the Go Rate 
 Make sure your rate limiter service is running:
 
 ```bash
-# Option 1: Using Docker Compose
-make docker-up
+# Option 1: Using Docker Compose (starts app and all databases)
+make docker-up 
 
 # Option 2: Local development (requires Redis running)
 RL_IP_LIMIT=5 RL_TOKEN_LIMIT_DEFAULT=10 RL_CUSTOM_TOKEN_LIMITS="abc123:20,premium:100" go run ./cmd/main.go
@@ -122,7 +122,7 @@ For burst testing and rate limit validation:
 ### ✅ Successful Requests
 - Status: `200 OK`
 - Headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
-- Body: `"pong"` (for ping) or JSON (for health)
+- Body: `"pong"`
 
 ### 🚫 Rate Limited Requests
 - Status: `429 Too Many Requests`

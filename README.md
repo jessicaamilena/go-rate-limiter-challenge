@@ -1,6 +1,9 @@
-# Go Rate Limiter with Gin & Redis
+# Go Rate Limiter
 
-A high-performance, configurable rate-limiting middleware for Gin-based HTTP servers. Features IP and token-based rate limiting with Redis persistence and strategy pattern for easy backend swapping.
+A high-performance, configurable rate-limiting middleware for Gin-based HTTP servers. Supports multiple storage backends (Redis, Memcached, MySQL and PostgreSQL) with IP and token-based rate limiting.
+
+This repository provides a `Makefile` with handy commands for building the project and managing the Docker services. Run `make help` to see all available targets.
+> Before using the Makefile, make sure you have `make` and Docker installed.
 
 ## 🚀 Features
 
@@ -12,16 +15,22 @@ A high-performance, configurable rate-limiting middleware for Gin-based HTTP ser
 - **Strategy Pattern**: Easy to swap storage backends
 - **Ban Duration**: Configurable ban periods when limits are exceeded
 - **Rate Limit Headers**: Standard HTTP rate limiting headers
-- **Dockerized**: Full Docker Compose setup with Redis
+- **Dockerized**: Docker Compose setup with Redis, Memcached, MySQL and PostgreSQL
 - **Comprehensive Testing**: Postman collection with extensive test scenarios
 
 ## 📋 Quick Start
 
 ### Using Docker (Recommended)
 
+When running the project for the first time, it's a good idea to rebuild the Docker services from scratch and start them in the background. This avoids interference from previous containers or volumes:
+
 ```bash
-# Start the services
-make docker-up
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d # starts app and all databases
+
+# View logs if you want to inspect the startup in detail
+docker-compose logs -f
 
 # Test the API
 curl http://localhost:8080/ping
@@ -30,14 +39,61 @@ curl http://localhost:8080/ping
 ### Local Development
 
 ```bash
-# Start Redis
-make dev-redis
+# Start a backend (redis, memcached, mysql or postgres)
+make dev-redis   # or dev-memcached, dev-mysql, dev-postgres
 
 # Set environment variables and run
 RL_IP_LIMIT=5 \
 RL_TOKEN_LIMIT_DEFAULT=10 \
 RL_CUSTOM_TOKEN_LIMITS="abc123:20,premium:100" \
-RL_BLOCK_DURATION_SECONDS=60 \
+RL_BLOCK_DURATION_SECONDS=300 \
+go run ./cmd/main.go
+```
+
+### Testing with Different Storage Backends
+
+1. Start the required storage service using Docker Compose (all services run with `make docker-up`):
+
+```bash
+# Redis (default)
+docker-compose up -d redis
+
+# Memcached
+docker-compose up -d memcached
+
+# MySQL
+docker-compose up -d mysql
+
+# PostgreSQL
+docker-compose up -d postgres
+```
+2. Run the application locally with the desired backend:
+
+#### Redis
+```bash
+STORAGE_BACKEND=redis REDIS_URL=redis://localhost:6379/0 \
+RL_IP_LIMIT=5 RL_TOKEN_LIMIT_DEFAULT=10 RL_BLOCK_DURATION_SECONDS=300 \
+go run ./cmd/main.go
+```
+
+#### Memcached
+```bash
+STORAGE_BACKEND=memcached MEMCACHED_SERVER=localhost:11211 \
+RL_IP_LIMIT=5 RL_TOKEN_LIMIT_DEFAULT=10 RL_BLOCK_DURATION_SECONDS=300 \
+go run ./cmd/main.go
+```
+
+#### MySQL
+```bash
+STORAGE_BACKEND=mysql MYSQL_DSN=root:root@tcp(localhost:3306)/go_rate_limiter_db?parseTime=true \
+RL_IP_LIMIT=5 RL_TOKEN_LIMIT_DEFAULT=10 RL_BLOCK_DURATION_SECONDS=300 \
+go run ./cmd/main.go
+```
+
+#### PostgreSQL
+```bash
+STORAGE_BACKEND=postgres POSTGRES_DSN=postgres://postgres:postgres@localhost:5432/go_rate_limiter_db?sslmode=disable \
+RL_IP_LIMIT=5 RL_TOKEN_LIMIT_DEFAULT=10 RL_BLOCK_DURATION_SECONDS=300 \
 go run ./cmd/main.go
 ```
 
@@ -51,9 +107,9 @@ go run ./cmd/main.go
          │                       │                       │
          │                       │                       │
     ┌────▼────┐             ┌────▼────┐             ┌────▼────┐
-    │ /ping   │             │ IP vs   │             │ Counter │
-    │ /health │             │ Token   │             │ & Ban   │
-    └─────────┘             │ Logic   │             │ Keys    │
+    │  /ping  │             │ IP vs   │             │ Counter │
+    └─────────┘             │ Token   │             │ & Ban   │
+                            │ Logic   │             │ Keys    │
                             └─────────┘             └─────────┘
 ```
 
@@ -92,18 +148,18 @@ rate-limiter-go/
 
 Configure the rate limiter using environment variables:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SERVER_PORT` | `8080` | HTTP server port |
-| `RL_IP_LIMIT` | `10` | Max requests per second per IP |
-| `RL_TOKEN_LIMIT_DEFAULT` | `50` | Default token limit per second |
-| `RL_CUSTOM_TOKEN_LIMITS` | `""` | Custom token limits (`token:limit,token:limit`) |
+| Variable                    | Default | Description |
+|-----------------------------|---------|-------------|
+| `SERVER_PORT`               | `8080` | HTTP server port |
+| `RL_IP_LIMIT`               | `10` | Max requests per second per IP |
+| `RL_TOKEN_LIMIT_DEFAULT`    | `50` | Default token limit per second |
+| `RL_CUSTOM_TOKEN_LIMITS`    | `""` | Custom token limits (`token:limit,token:limit`) |
 | `RL_BLOCK_DURATION_SECONDS` | `300` | Ban duration in seconds |
-| `STORE_BACKEND` | `redis` | `redis`, `memcached`, `mysql`, or `postgres` |
-| `REDIS_URL` | `redis://localhost:6379/0` | Redis connection string |
-| `MEMCACHED_SERVER` | `localhost:11211` | Comma-separated memcached servers |
-| `MYSQL_DSN` | `root:root@tcp(mysql:3306)/ratelimiter` | MySQL DSN |
-| `POSTGRES_DSN` | `postgres://postgres:postgres@postgres:5432/ratelimiter?sslmode=disable` | PostgreSQL DSN |
+| `STORAGE_BACKEND`           | `redis` | `redis`, `memcached`, `mysql`, or `postgres` |
+| `REDIS_URL`                 | `redis://localhost:6379/0` | Redis connection string |
+| `MEMCACHED_SERVER`          | `localhost:11211` | Comma-separated memcached servers |
+| `MYSQL_DSN`                 | `root:root@tcp(mysql:3306)/go_rate_limiter_db` | MySQL DSN |
+| `POSTGRES_DSN`              | `postgres://postgres:postgres@postgres:5432/go_rate_limiter_db?sslmode=disable` | PostgreSQL DSN |
 
 ### Example Configuration
 
@@ -117,8 +173,13 @@ RL_BLOCK_DURATION_SECONDS=300
 REDIS_URL=redis://localhost:6379/0
 STORE_BACKEND=redis
 MEMCACHED_SERVER=localhost:11211
-MYSQL_DSN=root:root@tcp(mysql:3306)/ratelimiter
-POSTGRES_DSN=postgres://postgres:postgres@postgres:5432/ratelimiter?sslmode=disable
+MYSQL_DSN=root:root@tcp(mysql:3306)/go_rate_limiter_db?parseTime=true
+POSTGRES_DSN=postgres://postgres:postgres@postgres:5432/go_rate_limiter_db?sslmode=disable
+```
+
+```bash
+# IDE environment mode - Do not 
+SERVER_PORT=8080;RL_IP_LIMIT=5;RL_TOKEN_LIMIT_DEFAULT=10;RL_CUSTOM_TOKEN_LIMITS=abc123:20,premium:100,enterprise:500;RL_BLOCK_DURATION_SECONDS=300;REDIS_URL=redis://localhost:6379/0;STORE_BACKEND=redis;MEMCACHED_SERVER=localhost:11211;MYSQL_DSN=root:root@tcp(mysql:3306)/go_rate_limiter_db?parseTime=true;POSTGRES_DSN=postgres://postgres:postgres@postgres:5432/go_rate_limiter_db?sslmode=disable
 ```
 
 ## 🔧 Usage
@@ -155,7 +216,7 @@ X-RateLimit-Reset: 1749922520
 
 ```json
 {
-  "error": "Rate limit exceeded",
+  "error": "Rate Limit Exceeded",
   "message": "You have reached the maximum number of requests or actions allowed within a certain time frame",
   "retry_after_seconds": 300
 }
@@ -175,13 +236,12 @@ X-RateLimit-Reset: 1749922520
 ```bash
 # Test basic functionality
 make test-ping
-make test-health
 
 # Test rate limiting
 make test-rate-limit
 
 # Load testing
-make docker-up
+make docker-up  # starts app and all databases
 # Then use Postman Runner or Newman
 ```
 
@@ -252,8 +312,8 @@ redis-cli ttl "ban:ip:127.0.0.1"
 ## 🐳 Docker Commands
 
 ```bash
-# Build and start services
-make docker-up
+# Build and start app and all databases
+make docker-up 
 
 # View logs
 make docker-logs
@@ -293,12 +353,6 @@ make docker-build
 # Build binary
 make build
 
-# Run locally
-make run
-
-# Run tests
-make test
-
 # Clean up
 make clean
 ```
@@ -320,10 +374,3 @@ func (m *MemcachedStorage) Increment(ctx context.Context, key string, window tim
     // Implementation
 }
 ```
-
-## 🔗 References
-
-- [Gin Web Framework](https://gin-gonic.com/)
-- [Redis](https://redis.io/)
-- [Rate Limiting Best Practices](https://www.figma.com/blog/an-alternative-approach-to-rate-limiting/)
-- [HTTP Rate Limiting Headers](https://tools.ietf.org/id/draft-polli-ratelimit-headers-00.html) 
