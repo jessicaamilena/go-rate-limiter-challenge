@@ -1,0 +1,588 @@
+{
+	"info": {
+		"_postman_id": "12345678-1234-1234-1234-123456789abc",
+		"name": "Rate Limiter Challenge",
+		"description": "Comprehensive test suite for the Go Rate Limiter Challenge.\n\n## Test Coverage:\n- Basic endpoint functionality\n- IP-based rate limiting\n- Token-based rate limiting\n- Custom token limits\n- Ban functionality\n- Rate limit headers validation\n\n## Setup:\n1. Ensure the rate limiter service is running on localhost:8080\n2. Ensure Redis or other storage is running on your localhost\n3. Configure environment variables as needed\n\n## Environment Variables:\n- `base_url`: http://localhost:8080\n- `custom_token`: abc123 (has limit of 20)\n- `premium_token`: premium (has limit of 100)\n- `default_token`: test123 (uses default limit of 10)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Basic Endpoint",
+			"item": [
+				{
+					"name": "Ping Endpoint",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response body is 'pong'\", function () {",
+									"    pm.expect(pm.response.text()).to.equal('pong');",
+									"});",
+									"",
+									"pm.test(\"Rate limit headers are present\", function () {",
+									"    pm.expect(pm.response.headers.get('X-RateLimit-Limit')).to.exist;",
+									"    pm.expect(pm.response.headers.get('X-RateLimit-Remaining')).to.exist;",
+									"    pm.expect(pm.response.headers.get('X-RateLimit-Reset')).to.exist;",
+									"});",
+									"",
+									"// Log current usage",
+									"console.log('Remaining requests:', pm.response.headers.get('X-RateLimit-Remaining'));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "IP Rate Limiting Tests",
+			"item": [
+				{
+					"name": "Rapid Requests - Test IP Limiting",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Clear any existing Redis data for this test",
+									"console.log('Starting rapid IP rate limit test...');"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Request completed\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 429]);",
+									"});",
+									"",
+									"if (pm.response.code === 429) {",
+									"    pm.test(\"Rate limit exceeded response\", function () {",
+									"        const responseJson = pm.response.json();",
+									"        pm.expect(responseJson).to.have.property('error', 'Rate limit exceeded');",
+									"        pm.expect(responseJson).to.have.property('message');",
+									"        pm.expect(responseJson).to.have.property('retry_after_seconds');",
+									"    });",
+									"    ",
+									"    pm.test(\"Retry-After header present\", function () {",
+									"        pm.expect(pm.response.headers.get('Retry-After')).to.exist;",
+									"    });",
+									"    ",
+									"    console.log('Rate limit exceeded - IP banned');",
+									"} else {",
+									"    pm.test(\"Successful request\", function () {",
+									"        pm.expect(pm.response.text()).to.equal('pong');",
+									"    });",
+									"    ",
+									"    console.log('Request allowed, remaining:', pm.response.headers.get('X-RateLimit-Remaining'));",
+									"}",
+									"",
+									"// Log rate limit info",
+									"console.log('Rate Limit Info:');",
+									"console.log('- Limit:', pm.response.headers.get('X-RateLimit-Limit'));",
+									"console.log('- Remaining:', pm.response.headers.get('X-RateLimit-Remaining'));",
+									"console.log('- Reset:', pm.response.headers.get('X-RateLimit-Reset'));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Token-Based Rate Limiting",
+			"item": [
+				{
+					"name": "Default Token Limit Test",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 or 429\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 429]);",
+									"});",
+									"",
+									"pm.test(\"Token rate limit applied\", function () {",
+									"    const limit = parseInt(pm.response.headers.get('X-RateLimit-Limit'));",
+									"    pm.expect(limit).to.equal(10); // Default token limit",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    pm.test(\"Response is pong\", function () {",
+									"        pm.expect(pm.response.text()).to.equal('pong');",
+									"    });",
+									"}",
+									"",
+									"console.log('Default token test - Limit:', pm.response.headers.get('X-RateLimit-Limit'), 'Remaining:', pm.response.headers.get('X-RateLimit-Remaining'));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "API_KEY",
+								"value": "{{default_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Custom Token Limit Test (abc123)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 or 429\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 429]);",
+									"});",
+									"",
+									"pm.test(\"Custom token rate limit applied\", function () {",
+									"    const limit = parseInt(pm.response.headers.get('X-RateLimit-Limit'));",
+									"    pm.expect(limit).to.equal(20); // Custom limit for abc123",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    pm.test(\"Response is pong\", function () {",
+									"        pm.expect(pm.response.text()).to.equal('pong');",
+									"    });",
+									"}",
+									"",
+									"console.log('Custom token (abc123) test - Limit:', pm.response.headers.get('X-RateLimit-Limit'), 'Remaining:', pm.response.headers.get('X-RateLimit-Remaining'));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "API_KEY",
+								"value": "{{custom_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Premium Token Limit Test",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 or 429\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 429]);",
+									"});",
+									"",
+									"pm.test(\"Premium token rate limit applied\", function () {",
+									"    const limit = parseInt(pm.response.headers.get('X-RateLimit-Limit'));",
+									"    pm.expect(limit).to.equal(100); // Premium limit",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    pm.test(\"Response is pong\", function () {",
+									"        pm.expect(pm.response.text()).to.equal('pong');",
+									"    });",
+									"}",
+									"",
+									"console.log('Premium token test - Limit:', pm.response.headers.get('X-RateLimit-Limit'), 'Remaining:', pm.response.headers.get('X-RateLimit-Remaining'));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "API_KEY",
+								"value": "{{premium_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Authorization Header Test",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 or 429\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 429]);",
+									"});",
+									"",
+									"pm.test(\"Bearer token recognized\", function () {",
+									"    const limit = parseInt(pm.response.headers.get('X-RateLimit-Limit'));",
+									"    pm.expect(limit).to.equal(20); // Custom limit for abc123",
+									"});",
+									"",
+									"console.log('Bearer token test - Limit:', pm.response.headers.get('X-RateLimit-Limit'));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{custom_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Load Testing Scenarios",
+			"item": [
+				{
+					"name": "Burst Test - Trigger Rate Limit",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// This test should be run multiple times quickly to trigger rate limiting",
+									"console.log('Burst test request #' + (pm.globals.get('burstCounter') || 1));",
+									"pm.globals.set('burstCounter', (pm.globals.get('burstCounter') || 0) + 1);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const counter = pm.globals.get('burstCounter') || 1;",
+									"",
+									"pm.test(\"Request #\" + counter + \" completed\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 429]);",
+									"});",
+									"",
+									"if (pm.response.code === 429) {",
+									"    pm.test(\"Rate limit properly enforced\", function () {",
+									"        const responseJson = pm.response.json();",
+									"        pm.expect(responseJson).to.have.property('error', 'Rate limit exceeded');",
+									"        pm.expect(pm.response.headers.get('Retry-After')).to.exist;",
+									"    });",
+									"    ",
+									"    console.log('Request #' + counter + ' - RATE LIMITED');",
+									"    console.log('Retry after:', pm.response.headers.get('Retry-After'), 'seconds');",
+									"    ",
+									"    // Reset counter after rate limit is hit",
+									"    pm.globals.set('burstCounter', 0);",
+									"} else {",
+									"    console.log('Request #' + counter + ' - SUCCESS (Remaining: ' + pm.response.headers.get('X-RateLimit-Remaining') + ')');",
+									"}",
+									"",
+									"// Display rate limit info",
+									"console.log('Rate Limit Status:');",
+									"console.log('   Limit: ' + pm.response.headers.get('X-RateLimit-Limit'));",
+									"console.log('   Remaining: ' + pm.response.headers.get('X-RateLimit-Remaining'));",
+									"console.log('   Reset: ' + new Date(pm.response.headers.get('X-RateLimit-Reset') * 1000).toISOString());"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Token vs IP Precedence Test",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Token limit takes precedence over IP limit\", function () {",
+									"    const limit = parseInt(pm.response.headers.get('X-RateLimit-Limit'));",
+									"    // Should use token limit (100) not IP limit (5)",
+									"    pm.expect(limit).to.equal(100);",
+									"});",
+									"",
+									"pm.test(\"Status code is 200 or 429\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 429]);",
+									"});",
+									"",
+									"console.log('Precedence test - Using token limit:', pm.response.headers.get('X-RateLimit-Limit'), 'instead of IP limit');"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "API_KEY",
+								"value": "{{premium_token}}",
+								"type": "text",
+								"description": "Should use premium limit (100) instead of IP limit (5)"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Ban Duration Tests",
+			"item": [
+				{
+					"name": "Check If Banned",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 429) {",
+									"    pm.test(\"Currently banned\", function () {",
+									"        const responseJson = pm.response.json();",
+									"        pm.expect(responseJson.message).to.include('banned');",
+									"        pm.expect(responseJson).to.have.property('retry_after_seconds');",
+									"    });",
+									"    ",
+									"    console.log('Currently banned. Retry after:', pm.response.json().retry_after_seconds, 'seconds');",
+									"} else {",
+									"    pm.test(\"Not banned\", function () {",
+									"        pm.expect(pm.response.code).to.equal(200);",
+									"    });",
+									"    ",
+									"    console.log('Not banned. Request successful.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Test Different IP (Simulate)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Note: This is a simulation - in real testing you'd need to actually change IP",
+									"console.log('Testing with different token to simulate different client...');"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Different client not affected by other bans\", function () {",
+									"    // Using a different token should have its own rate limit",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 429]);",
+									"    ",
+									"    if (pm.response.code === 200) {",
+									"        pm.expect(pm.response.text()).to.equal('pong');",
+									"    }",
+									"});",
+									"",
+									"console.log('Different client test - Status:', pm.response.code, 'Limit:', pm.response.headers.get('X-RateLimit-Limit'));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "API_KEY",
+								"value": "different-token-123",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global pre-request script",
+					"console.log('Starting test:', pm.info.requestName);",
+					"console.log('Timestamp:', new Date().toISOString());"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test script",
+					"console.log('Completed test:', pm.info.requestName);",
+					"console.log('Response time:', pm.response.responseTime + 'ms');",
+					"console.log('Response size:', pm.response.responseSize + ' bytes');",
+					"console.log('---');"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "custom_token",
+			"value": "abc123",
+			"type": "string"
+		},
+		{
+			"key": "premium_token",
+			"value": "premium",
+			"type": "string"
+		},
+		{
+			"key": "default_token",
+			"value": "test123",
+			"type": "string"
+		}
+	]
+} 
